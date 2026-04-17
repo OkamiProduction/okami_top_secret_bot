@@ -48,7 +48,7 @@ jobs:
           script: |
             set -e
             # Создаём .env
-            sudo cat > /opt/tgbot/.env << EOF
+            sudo tee /opt/tgbot/.env > /dev/null << EOF
             TELEGRAM_TOKEN=${{ secrets.STAGING_BOT_TOKEN }}
             DEBUG=${{ secrets.STAGING_BOT_DEBUG }}
             LOG_LEVEL=${{ secrets.STAGING_BOT_LOG_LEVEL }}
