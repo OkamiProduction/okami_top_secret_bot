@@ -109,7 +109,20 @@ useradd -r -s /bin/false -m -d /opt/github-deploy github-deploy
 usermod -aG tgbot github-deploy
 ```
 
-### 2. Настройка sudo для `github-deploy`
+### 2. Настройка прав на директории
+
+Создайте рабочую директорию и установите права:
+
+```bash
+mkdir -p /opt/tgbot
+chown tgbot:tgbot /opt/tgbot
+chmod 775 /opt/tgbot   # группа tgbot имеет запись, чтобы github-deploy мог копировать файлы
+
+mkdir -p /var/log/tgbot
+chown tgbot:tgbot /var/log/tgbot
+```
+
+### 3. Настройка sudo для `github-deploy`
 
 Создайте файл `/etc/sudoers.d/github-deploy`:
 
@@ -117,13 +130,15 @@ usermod -aG tgbot github-deploy
 visudo -f /etc/sudoers.d/github-deploy
 ```
 
-Содержимое:
+Содержимое (проверьте пути через `which`):
 
 ```text
-github-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart tgbot, /bin/systemctl status tgbot, /bin/chown tgbot\:tgbot /opt/tgbot/*, /bin/chmod +x /opt/tgbot/tgbot, /bin/chmod 600 /opt/tgbot/.env, /bin/cat > /opt/tgbot/.env
+github-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart tgbot, /bin/systemctl status tgbot, /bin/chown tgbot\:tgbot /opt/tgbot/*, /bin/chmod +x /opt/tgbot/tgbot, /bin/chmod 600 /opt/tgbot/.env, /usr/bin/tee /opt/tgbot/.env
 ```
 
-### 3. SSH-ключи для `github-deploy`
+**Важно:** путь к `tee` может быть `/bin/tee`. Уточните командой `which tee`.
+
+### 4. SSH-ключи для `github-deploy`
 
 Сгенерируйте ключи и добавьте публичный в `authorized_keys`:
 
@@ -136,11 +151,11 @@ chown -R github-deploy:github-deploy /opt/github-deploy/.ssh
 chmod 600 /opt/github-deploy/.ssh/authorized_keys
 ```
 
-**Важно:** Скопируйте **приватный ключ** (содержимое `/opt/github-deploy/.ssh/id_ed25519`) — он потребуется для секрета `STAGING_SSH_PRIVATE_KEY` в GitHub.
+**Скопируйте приватный ключ** (содержимое `/opt/github-deploy/.ssh/id_ed25519`) — он потребуется для секрета `STAGING_SSH_PRIVATE_KEY` в GitHub.
 
-### 4. Размещение файлов проекта
+### 5. Первоначальное размещение файлов (опционально)
 
-Первоначально скопируйте бинарник и `.env` в `/opt/tgbot/`:
+Для первого запуска можно вручную скопировать бинарник и `.env`:
 
 ```bash
 # Локально соберите под Linux
@@ -157,7 +172,7 @@ chown -R tgbot:tgbot /opt/tgbot
 chmod +x /opt/tgbot/tgbot
 ```
 
-### 5. Установка systemd-сервиса
+### 6. Установка systemd-сервиса
 
 Скопируйте unit-файл из репозитория:
 
@@ -171,15 +186,6 @@ scp deploy/tgbot.service root@<IP>:/etc/systemd/system/
 systemctl daemon-reload
 systemctl enable tgbot.service
 systemctl start tgbot.service
-```
-
-### 6. Логирование
-
-Создайте директорию для логов:
-
-```bash
-mkdir -p /var/log/tgbot
-chown tgbot:tgbot /var/log/tgbot
 ```
 
 ---
@@ -207,8 +213,8 @@ chown tgbot:tgbot /var/log/tgbot
 
 1. Клонирует репозиторий.
 2. Устанавливает Go и собирает бинарник под Linux.
-3. Копирует бинарник на сервер в `/opt/tgbot/`.
-4. Генерирует `.env` файл из секретов.
+3. Копирует бинарник на сервер в `/opt/tgbot/` через SCP.
+4. Генерирует `.env` файл из секретов с помощью `sudo tee`.
 5. Перезапускает systemd-сервис.
 6. Отправляет уведомление в Telegram с именем автора, коммитом и статусом.
 
@@ -282,6 +288,7 @@ case "/newfeature":
 - [ ] Мониторинг живости (Healthchecks.io)
 - [ ] Метрики и алерты
 - [ ] Production-окружение
+- [ ] Контейнеризация (Docker)
 
 ---
 
