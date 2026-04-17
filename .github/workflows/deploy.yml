@@ -27,16 +27,13 @@ jobs:
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           script: sudo systemctl stop tgbot
 
-      - name: Copy binary to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.STAGING_SSH_HOST }}
-          username: ${{ secrets.STAGING_SSH_USER }}
-          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          source: "tgbot"
-          target: "/opt/tgbot/"
-          strip_components: 0
-          overwrite: true
+      - name: Deploy binary via ssh (as tgbot)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }} "sudo -u tgbot bash -c 'cat > /opt/tgbot/tgbot && chmod +x /opt/tgbot/tgbot'" < tgbot
+        shell: bash
 
       - name: Create .env and restart service
         uses: appleboy/ssh-action@v1.0.3
@@ -54,8 +51,6 @@ jobs:
             EOF
             sudo chown tgbot:tgbot /opt/tgbot/.env
             sudo chmod 600 /opt/tgbot/.env
-            sudo chown tgbot:tgbot /opt/tgbot/tgbot
-            sudo chmod +x /opt/tgbot/tgbot
             sudo systemctl restart tgbot
             echo "✅ Staging деплой завершён"
 
