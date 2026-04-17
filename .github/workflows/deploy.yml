@@ -1,32 +1,24 @@
-# Имя workflow, отображается на вкладке Actions
 name: Deploy to Staging
 
-# Событие, запускающее workflow — пуш в указанную ветку
 on:
   push:
-    branches: [ main ]   # Если ваша основная ветка называется иначе (например, tg-bot), измените здесь
+    branches: [ main ]
 
-# Одна задача (job), которая выполняется на свежем Ubuntu
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # Шаг 1: Клонируем репозиторий внутрь раннера
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Шаг 2: Устанавливаем Go нужной версии
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
 
-      # Шаг 3: Собираем бинарник под Linux (даже если раннер работает на Linux, кросс-компиляция гарантирует совместимость)
       - name: Build binary
         run: GOOS=linux GOARCH=amd64 go build -o tgbot .
 
-      # Шаг 4: Копируем бинарник на сервер
       - name: Copy binary to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -36,9 +28,8 @@ jobs:
           source: "tgbot"
           target: "/opt/tgbot/"
           strip_components: 0
-          overwrite: true   # важный параметр, чтобы перезаписывать существующий файл
+          overwrite: true
 
-      # Шаг 5: Создаём .env файл на сервере и перезапускаем сервис
       - name: Create .env and restart service
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -47,7 +38,6 @@ jobs:
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
           script: |
             set -e
-            # Создаём .env
             sudo tee /opt/tgbot/.env > /dev/null << EOF
             TELEGRAM_TOKEN=${{ secrets.STAGING_BOT_TOKEN }}
             DEBUG=${{ secrets.STAGING_BOT_DEBUG }}
@@ -56,28 +46,32 @@ jobs:
             EOF
             sudo chown tgbot:tgbot /opt/tgbot/.env
             sudo chmod 600 /opt/tgbot/.env
-
-            # Исправляем владельца бинарника (на случай, если он изменился)
             sudo chown tgbot:tgbot /opt/tgbot/tgbot
             sudo chmod +x /opt/tgbot/tgbot
-
-            # Перезапускаем
             sudo systemctl restart tgbot
-
             echo "✅ Staging деплой завершён"
 
-      # Шаг 6: Отправляем уведомление в Telegram о результате деплоя
-      - name: Send Telegram notification
-        if: always()   # Выполняется всегда, даже если предыдущие шаги упали (чтобы видеть ошибки)
+      - name: Send Telegram notification (success)
+        if: success()
         uses: appleboy/telegram-action@master
         with:
-          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}       # ID чата/группы
-          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}  # Токен бота-уведомителя
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
           message: |
-            🚀 *Deploy to Staging*
-            Author: ${{ github.actor }}
-            Branch: `${{ github.ref_name }}`
+            ✅ *CI/CD Success*
             Commit: `${{ github.sha }}`
             Message: ${{ github.event.head_commit.message }}
-            Status: ${{ job.status }}
+            Author: ${{ github.actor }}
             [View changes](${{ github.event.head_commit.url }})
+
+      - name: Send Telegram notification (failure)
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ❌ *CI/CD Failed*
+            Commit: `${{ github.sha }}`
+            Author: ${{ github.actor }}
+            [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+
+      # Опционально: линтер (раскомментируйте при необходимости)
+      # - name: Lint
+      #   uses: golangci/golangci-lint-action@v6
+      #   with:
+      #     version: latest
+
+      - name: Notify success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ✅ *CI Success*
+            [PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+            Author: ${{ github.event.pull_request.user.login }}
+
+      - name: Notify failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ❌ *CI Failed*
+            [PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+            Author: ${{ github.event.pull_request.user.login }}
+            [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

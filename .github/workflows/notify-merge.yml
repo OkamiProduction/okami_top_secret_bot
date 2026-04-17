@@ -1,0 +1,22 @@
+name: Notify Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [ main ]
+
+jobs:
+  notify:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send merge notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            🎉 *Merged Successfully*
+            [PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+            Author: ${{ github.event.pull_request.user.login }}
+            Merged by: ${{ github.event.pull_request.merged_by.login }}
