@@ -1,70 +1,41 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv"
+	"okami_top_secret_bot/internal/bot"
+	"okami_top_secret_bot/internal/config"
+	"okami_top_secret_bot/internal/logger"
 )
 
 func main() {
-	// 1. Загружаем .env файл
-	err := godotenv.Load()
+	// 1. Конфигурация
+	cfg, err := config.Load()
 	if err != nil {
-		log.Println("⚠️  .env файл не найден, используются системные переменные окружения")
+		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
 
-	// 2. Читаем обязательные переменные
-	token := os.Getenv("TELEGRAM_TOKEN")
-	if token == "" {
-		log.Fatal("❌ TELEGRAM_TOKEN не задан ни в .env, ни в системном окружении")
-	}
+	// 2. Инициализация логгера
+	logger := logger.New(cfg.LogLevel, cfg.LogFile)
 
-	debug := os.Getenv("DEBUG") == "true"
-
-	// 3. Создаём клиент бота
-	bot, err := tgbotapi.NewBotAPI(token)
+	// 3. Создание бота
+	b, err := bot.New(cfg.TelegramToken, cfg.Debug, logger)
 	if err != nil {
-		log.Panic("❌ Не удалось подключиться к Telegram API:", err)
+		logger.Error("Не удалось создать бота", "error", err)
+		os.Exit(1)
 	}
 
-	// 4. Включаем отладку, если нужно
-	bot.Debug = debug
-	if debug {
-		log.Printf("✅ Авторизован как @%s (режим отладки ВКЛ)", bot.Self.UserName)
-	} else {
-		log.Printf("✅ Бот @%s запущен", bot.Self.UserName)
-	}
+	// 4. Контекст для graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// 5. Настройка получения обновлений (Long Polling)
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := bot.GetUpdatesChan(u)
-
-	// 6. Бесконечный цикл обработки сообщений
-	for update := range updates {
-		// Пропускаем не-сообщения (например, колбэки от кнопок)
-		if update.Message == nil {
-			continue
-		}
-
-		// Обработка команд
-		var replyText string
-		switch update.Message.Text {
-		case "/start":
-			replyText = "👋 Привет! Я бот на Go. Использую .env для конфигурации."
-		case "/help":
-			replyText = "ℹ️ Я пока умею только отвечать на /start и /help."
-		default:
-			replyText = "Я не понимаю эту команду. Попробуйте /help"
-		}
-
-		// Отправляем ответ
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, replyText)
-		if _, err := bot.Send(msg); err != nil {
-			log.Printf("❌ Ошибка отправки: %v", err)
-		}
+	// 5. Запуск бота
+	if err := b.Start(ctx); err != nil {
+		logger.Error("Бот завершился с ошибкой", "error", err)
+		os.Exit(1)
 	}
 }
