@@ -19,6 +19,14 @@ jobs:
       - name: Build binary
         run: GOOS=linux GOARCH=amd64 go build -o tgbot .
 
+      - name: Stop service before deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: sudo systemctl stop tgbot
+
       - name: Copy binary to server
         uses: appleboy/scp-action@v0.1.7
         with:
