@@ -1,0 +1,35 @@
+name: Notify Review
+
+on:
+  pull_request_review:
+    types: [submitted]
+    branches: [ main ]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine action and emoji
+        id: vars
+        run: |
+          if [ "${{ github.event.review.state }}" = "approved" ]; then
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "action=Approved" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.review.state }}" = "changes_requested" ]; then
+            echo "emoji=🔴" >> $GITHUB_OUTPUT
+            echo "action=Requested Changes" >> $GITHUB_OUTPUT
+          else
+            echo "emoji=💬" >> $GITHUB_OUTPUT
+            echo "action=Commented" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send review notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_NOTIFY_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ${{ steps.vars.outputs.emoji }} *${{ steps.vars.outputs.action }}*
+            [PR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+            Reviewer: ${{ github.event.review.user.login }}
+            ${{ github.event.review.body }}
