@@ -26,14 +26,17 @@ jobs:
       - name: Build binary
         run: GOOS=linux GOARCH=amd64 go build -o tgbot .
 
-      # Шаг 4: Деплой бинарника через install
-      - name: Deploy binary via install
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          cat tgbot | ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }} "sudo -u tgbot install -m 755 /dev/stdin /opt/tgbot/tgbot"
-        shell: bash
+      # Шаг 4: Копируем бинарник на сервер
+      - name: Copy binary to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          source: "tgbot"
+          target: "/opt/tgbot/"
+          strip_components: 0
+          overwrite: true   # важный параметр, чтобы перезаписывать существующий файл
 
       # Шаг 5: Создаём .env файл на сервере и перезапускаем сервис
       - name: Create .env and restart service
@@ -42,27 +45,23 @@ jobs:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER }}
           key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
-          # Скрипт выполняется на сервере от имени STAGING_SSH_USER с использованием sudo (настроено в sudoers)
           script: |
-            set -e  # Прерываем выполнение при любой ошибке
-
-            # Генерируем .env файл с переменными окружения для бота
+            set -e
+            # Создаём .env
             sudo cat > /opt/tgbot/.env << EOF
             TELEGRAM_TOKEN=${{ secrets.STAGING_BOT_TOKEN }}
             DEBUG=${{ secrets.STAGING_BOT_DEBUG }}
             LOG_LEVEL=${{ secrets.STAGING_BOT_LOG_LEVEL }}
             LOG_FILE=/var/log/tgbot/bot.log
             EOF
-
-            # Устанавливаем владельца и права: пользователь tgbot должен иметь доступ
             sudo chown tgbot:tgbot /opt/tgbot/.env
-            sudo chmod 600 /opt/tgbot/.env   # Только владелец может читать/писать
+            sudo chmod 600 /opt/tgbot/.env
 
-            # Обновляем права на бинарник
+            # Исправляем владельца бинарника (на случай, если он изменился)
             sudo chown tgbot:tgbot /opt/tgbot/tgbot
             sudo chmod +x /opt/tgbot/tgbot
 
-            # Перезапускаем systemd-сервис
+            # Перезапускаем
             sudo systemctl restart tgbot
 
             echo "✅ Staging деплой завершён"
