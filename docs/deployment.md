@@ -125,10 +125,21 @@ systemctl start tgbot.service
 - **Триггер:** Push в ветку `main` (после мёрджа PR).
 - **Действия:**
   1. Сборка бинарника под Linux.
-  2. Копирование на сервер через SCP.
-  3. Генерация `.env` из секретов.
-  4. Перезапуск systemd-сервиса.
-  5. Уведомление в Telegram.
+  2. Остановка systemd-сервиса (`sudo systemctl stop tgbot`).
+  3. Передача бинарника через SSH и запись от имени `tgbot` (команда `sudo -u tgbot bash -c 'cat > /opt/tgbot/tgbot && chmod +x ...'`).
+  4. Генерация `.env` из секретов GitHub.
+  5. Перезапуск systemd-сервиса (`sudo systemctl restart tgbot`).
+  6. Отправка уведомления в Telegram.
+
+### 🔧 Решение проблемы прав при обновлении бинарника
+
+При использовании SCP возникали ошибки `Permission denied` и `utime`, так как файл принадлежал `tgbot`, а `github-deploy` не мог изменить его метаданные. Финальное решение:
+
+- Бинарник передаётся по SSH напрямую через `cat < tgbot | ssh ... "sudo -u tgbot bash -c 'cat > /opt/tgbot/tgbot && chmod +x ...'"`.
+- Это создаёт/перезаписывает файл сразу от имени `tgbot`, что исключает конфликты владельцев и прав.
+- Сервис останавливается перед копированием и запускается после (`systemctl stop/restart`).
+
+Такой подход надёжен, не требует ослабления прав и легко воспроизводится.
 
 ### 📄 `.github/workflows/notify-merge.yml` — уведомление о мёрдже
 
@@ -171,9 +182,9 @@ systemctl start tgbot.service
 ### Обновление бинарника вручную (если CI/CD недоступен)
 
 ```bash
-# Локально
+# Локально собрать и передать через SSH
 GOOS=linux GOARCH=amd64 go build -o tgbot .
-scp tgbot .env github-deploy@<IP>:/opt/tgbot/
+cat tgbot | ssh github-deploy@<IP> "sudo -u tgbot bash -c 'cat > /opt/tgbot/tgbot && chmod +x /opt/tgbot/tgbot'"
 ssh github-deploy@<IP> "sudo systemctl restart tgbot"
 ```
 

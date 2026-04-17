@@ -58,6 +58,8 @@ chown -R tgbot:tgbot /opt/tgbot
 chmod 775 /opt/tgbot
 ```
 
+> **Важно:** Бинарный файл `/opt/tgbot/tgbot` создаётся и обновляется от имени `tgbot` через CI/CD, поэтому его владельцем всегда остаётся `tgbot:tgbot`. Права `755` устанавливаются автоматически.
+
 - Владелец: `tgbot`
 - Группа: `tgbot`
 - Права: `rwxrwxr-x` (владелец и группа могут писать, остальные — только читать и исполнять).
@@ -115,13 +117,15 @@ chown -R github-deploy:github-deploy /opt/github-deploy/.ssh
 Файл `/etc/sudoers.d/github-deploy` (редактировать через `visudo -f /etc/sudoers.d/github-deploy`):
 
 ```text
-github-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart tgbot, /bin/systemctl status tgbot, /bin/chown tgbot\:tgbot /opt/tgbot/*, /bin/chmod +x /opt/tgbot/tgbot, /bin/chmod 600 /opt/tgbot/.env, /usr/bin/tee /opt/tgbot/.env
+github-deploy ALL=(ALL) NOPASSWD: /bin/systemctl stop tgbot, /bin/systemctl restart tgbot, /bin/systemctl status tgbot, /usr/bin/tee /opt/tgbot/.env, /bin/chown tgbot\:tgbot /opt/tgbot/.env, /bin/chmod 600 /opt/tgbot/.env
+github-deploy ALL=(tgbot) NOPASSWD: ALL
 ```
 
 **Пояснение:**
-- `/bin/systemctl restart tgbot` — перезапуск сервиса.
-- `/bin/chown tgbot\:tgbot /opt/tgbot/*` — смена владельца на `tgbot` (например, после копирования бинарника).
-- `/usr/bin/tee /opt/tgbot/.env` — запись `.env` из стандартного ввода (используется в workflow).
+- Первая строка разрешает управление сервисом и запись `.env` от `root`.
+- Вторая строка разрешает выполнять **любые** команды от имени пользователя `tgbot` без пароля. Это необходимо для шага деплоя, где используется `sudo -u tgbot bash -c '...'`.
+
+Так как `github-deploy` не имеет интерактивного входа, такое делегирование безопасно.
 
 Убедитесь, что пути к исполняемым файлам совпадают с реальными (проверьте через `which systemctl`, `which tee`).
 
