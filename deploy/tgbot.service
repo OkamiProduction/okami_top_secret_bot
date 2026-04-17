@@ -1,0 +1,30 @@
+[Unit]
+Description=Telegram Bot (tgbot)
+After=network.target
+# Документация: https://github.com/OkamiProduction/okami_top_secret_bot
+
+[Service]
+Type=simple
+# Пользователь и группа, от которых работает бот
+User=tgbot
+Group=tgbot
+# Рабочая директория (там лежит бинарник и .env)
+WorkingDirectory=/opt/tgbot
+# Файл с переменными окружения
+EnvironmentFile=/opt/tgbot/.env
+# Запускаемый бинарник
+ExecStart=/opt/tgbot/tgbot
+# Автоматический перезапуск при падении
+Restart=always
+RestartSec=5
+
+# Логи пишутся в journald (просмотр: journalctl -u tgbot -f)
+StandardOutput=journal
+StandardError=journal
+
+# Повышение безопасности
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
