@@ -1,62 +1,51 @@
 # 🤖 Okami Top Secret Bot
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![Telegram Bot API](https://img.shields.io/badge/Telegram%20Bot%20API-v5.0-blue?style=flat&logo=telegram)](https://core.telegram.org/bots/api)
+[![CI](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/ci.yml/badge.svg)](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/ci.yml)
+[![Deploy](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/deploy.yml/badge.svg)](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/deploy.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![CI/CD](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/deploy.yml/badge.svg)](https://github.com/OkamiProduction/okami_top_secret_bot/actions/workflows/deploy.yml)
 
-Telegram-бот для автоматизации контрольных работ, написанный на Go с соблюдением принципов чистой архитектуры. Поддерживает структурированное логирование с ротацией, деплой на VPS через systemd и полностью автоматический CI/CD с уведомлениями в Telegram.
+**Telegram-бот для автоматизации контрольных работ**, написанный на Go с соблюдением принципов чистой архитектуры. Поддерживает структурированное логирование с ротацией, полностью автоматический CI/CD, деплой на VPS через systemd и прозрачные уведомления в Telegram.
 
----
-
-## 📁 Структура проекта
-
-```text
-.
-├── .env.example               # Шаблон переменных окружения
-├── .gitignore
-├── go.mod
-├── go.sum
-├── main.go                    # Точка входа
-├── internal/
-│   ├── config/                # Загрузка конфигурации из .env
-│   │   └── config.go
-│   ├── logger/                # slog + ротация через lumberjack
-│   │   └── logger.go
-│   └── bot/                   # Основная логика бота
-│       └── bot.go
-├── deploy/
-│   └── tgbot.service          # Systemd unit-файл
-├── scripts/
-│   └── clean_logs.sh          # Скрипт очистки логов
-├── .github/
-│   └── workflows/
-│       └── deploy.yml         # Автоматический деплой на staging
-└── README.md
-```
+> ⚠️ **Важно:** Репозиторий сделан публичным **исключительно для включения обязательной защиты веток** (бесплатный тариф GitHub Team не использовался). Код не предназначен для внешнего использования или контрибьютинга.
 
 ---
 
-## 📋 Требования
+## 📌 Текущее состояние проекта
 
-- Go **1.21** или новее
-- Токен Telegram бота (получить у [@BotFather](https://t.me/BotFather))
-- VPS с Linux (для staging/production) или локальная машина для разработки
+- ✅ **Основа бота** — обработка команд `/start`, `/help`, легко расширяется.
+- ✅ **Чистая архитектура** — разделение на слои (`config`, `logger`, `bot`), независимость от фреймворков.
+- ✅ **Структурированное логирование** — `log/slog` + ротация файлов (`lumberjack`).
+- ✅ **Деплой на VPS** — systemd-сервис, отдельные пользователи для запуска и CI/CD.
+- ✅ **CI/CD (GitHub Actions)**:
+  - `ci.yml` — сборка и тесты при каждом PR в `main`.
+  - `deploy.yml` — автоматический деплой на staging-сервер при пуше в `main`.
+- ✅ **Защита ветки `main`** — обязательные PR и успешный статус `test`.
+- ✅ **Уведомления в Telegram** — о результатах CI/CD, ревью и мёрджах.
+- 🚧 **В планах**:
+  - Мониторинг живости бота (Healthchecks.io / Uptime Robot).
+  - Добавление функционала контрольных работ.
+  - Production-окружение (отдельный сервер и workflow).
 
 ---
 
-## 🚀 Быстрый старт (локально)
+## 🚀 Быстрый старт (локальная разработка)
 
-### 1. Клонирование
+### Требования
+- Go 1.22+
+- Токен Telegram-бота (получить у [@BotFather](https://t.me/BotFather))
+
+### 1. Клонирование репозитория
 
 ```bash
 git clone https://github.com/OkamiProduction/okami_top_secret_bot.git
 cd okami_top_secret_bot
 ```
 
-### 2. Настройка переменных
+### 2. Настройка переменных окружения
 
-Скопируйте шаблон и отредактируйте `.env`:
+Скопируйте шаблон и заполните `.env`:
 
 ```bash
 cp .env.example .env
@@ -71,231 +60,42 @@ LOG_LEVEL=info
 LOG_FILE=./bot.log
 ```
 
-### 3. Установка зависимостей
+### 3. Установка зависимостей и запуск
 
 ```bash
 go mod tidy
-```
-
-### 4. Запуск
-
-```bash
 go run main.go
 ```
 
----
-
-## 🖥️ Настройка сервера (Staging)
-
-### Системные требования
-- Linux (Ubuntu/Debian)
-- Доступ по SSH с правами root
-
-### 1. Создание пользователей
-
-На сервере должны быть созданы:
-
-- **`tgbot`** — системный пользователь для запуска бота (без права входа).
-- **`github-deploy`** — технический пользователь для CI/CD (без интерактивного входа).
-
-Выполните под `root`:
-
-```bash
-# Пользователь для бота
-useradd -r -s /bin/false -m -d /opt/tgbot tgbot
-
-# Пользователь для GitHub Actions
-useradd -r -s /bin/false -m -d /opt/github-deploy github-deploy
-usermod -aG tgbot github-deploy
-```
-
-### 2. Настройка прав на директории
-
-Создайте рабочую директорию и установите права:
-
-```bash
-mkdir -p /opt/tgbot
-chown tgbot:tgbot /opt/tgbot
-chmod 775 /opt/tgbot   # группа tgbot имеет запись, чтобы github-deploy мог копировать файлы
-
-mkdir -p /var/log/tgbot
-chown tgbot:tgbot /var/log/tgbot
-```
-
-### 3. Настройка sudo для `github-deploy`
-
-Создайте файл `/etc/sudoers.d/github-deploy`:
-
-```bash
-visudo -f /etc/sudoers.d/github-deploy
-```
-
-Содержимое (проверьте пути через `which`):
-
-```text
-github-deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart tgbot, /bin/systemctl status tgbot, /bin/chown tgbot\:tgbot /opt/tgbot/*, /bin/chmod +x /opt/tgbot/tgbot, /bin/chmod 600 /opt/tgbot/.env, /usr/bin/tee /opt/tgbot/.env
-```
-
-**Важно:** путь к `tee` может быть `/bin/tee`. Уточните командой `which tee`.
-
-### 4. SSH-ключи для `github-deploy`
-
-Сгенерируйте ключи и добавьте публичный в `authorized_keys`:
-
-```bash
-mkdir -p /opt/github-deploy/.ssh
-chmod 700 /opt/github-deploy/.ssh
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f /opt/github-deploy/.ssh/id_ed25519 -N ""
-cat /opt/github-deploy/.ssh/id_ed25519.pub >> /opt/github-deploy/.ssh/authorized_keys
-chown -R github-deploy:github-deploy /opt/github-deploy/.ssh
-chmod 600 /opt/github-deploy/.ssh/authorized_keys
-```
-
-**Скопируйте приватный ключ** (содержимое `/opt/github-deploy/.ssh/id_ed25519`) — он потребуется для секрета `STAGING_SSH_PRIVATE_KEY` в GitHub.
-
-### 5. Первоначальное размещение файлов (опционально)
-
-Для первого запуска можно вручную скопировать бинарник и `.env`:
-
-```bash
-# Локально соберите под Linux
-GOOS=linux GOARCH=amd64 go build -o tgbot .
-
-# Скопируйте на сервер
-scp tgbot .env root@<IP>:/opt/tgbot/
-```
-
-На сервере установите права:
-
-```bash
-chown -R tgbot:tgbot /opt/tgbot
-chmod +x /opt/tgbot/tgbot
-```
-
-### 6. Установка systemd-сервиса
-
-Скопируйте unit-файл из репозитория:
-
-```bash
-scp deploy/tgbot.service root@<IP>:/etc/systemd/system/
-```
-
-Активируйте и запустите:
-
-```bash
-systemctl daemon-reload
-systemctl enable tgbot.service
-systemctl start tgbot.service
-```
+Бот начнёт принимать сообщения (long polling). Логи выводятся в консоль и в файл `bot.log`.
 
 ---
 
-## 🔐 Секреты GitHub Actions
+## 📚 Подробная документация
 
-Для работы CI/CD добавьте следующие секреты в репозиторий (**Settings → Secrets and variables → Actions**):
+Вся детальная информация вынесена в отдельные документы в папке `docs/`. Рекомендуется изучить их **перед началом работы с проектом**.
 
-| Секрет | Описание |
-|--------|----------|
-| `STAGING_SSH_HOST` | IP-адрес или домен staging-сервера |
-| `STAGING_SSH_USER` | `github-deploy` |
-| `STAGING_SSH_PRIVATE_KEY` | **Приватный** SSH-ключ пользователя `github-deploy` |
-| `STAGING_BOT_TOKEN` | Токен Telegram-бота для staging |
-| `STAGING_BOT_DEBUG` | `true` или `false` |
-| `STAGING_BOT_LOG_LEVEL` | `info` / `debug` / `warn` / `error` |
-| `TELEGRAM_NOTIFY_BOT_TOKEN` | Токен бота, отправляющего уведомления |
-| `TELEGRAM_NOTIFY_CHAT_ID` | ID чата/группы для уведомлений |
+| Документ | Содержание |
+|----------|------------|
+| [📖 Локальная разработка](docs/local-dev.md) | Структура проекта, добавление новых команд, конфигурация |
+| [🚀 Деплой и CI/CD](docs/deployment.md) | Настройка сервера, systemd, GitHub Actions, защита веток |
+| [📊 Логирование](docs/logging.md) | Конфигурация `slog`, ротация файлов, очистка логов |
+| [🔐 Безопасность и пользователи](docs/security.md) | Разделение привилегий, создание пользователей, sudoers, секреты |
+| [📨 Уведомления](docs/notifications.md) | Настройка Telegram-бота для уведомлений, типы сообщений |
 
 ---
 
-## 🔄 CI/CD (GitHub Actions)
+## 🛠️ Используемые технологии
 
-При каждом пуше в ветку `main` (или `tg-bot` — зависит от настройки) workflow автоматически:
-
-1. Клонирует репозиторий.
-2. Устанавливает Go и собирает бинарник под Linux.
-3. Копирует бинарник на сервер в `/opt/tgbot/` через SCP.
-4. Генерирует `.env` файл из секретов с помощью `sudo tee`.
-5. Перезапускает systemd-сервис.
-6. Отправляет уведомление в Telegram с именем автора, коммитом и статусом.
-
-Файл workflow: `.github/workflows/deploy.yml`.
-
----
-
-## 📊 Логирование и мониторинг
-
-### Просмотр логов
-
-```bash
-# Логи systemd (текстовый вывод)
-journalctl -u tgbot -f
-
-# JSON-логи с ротацией
-tail -f /var/log/tgbot/bot.log
-```
-
-### Параметры ротации
-
-Встроены в `internal/logger/logger.go`:
-- Максимальный размер файла: 10 МБ
-- Хранится 5 старых файлов
-- Максимальный возраст: 30 дней
-- Сжатие gzip
-
-### Очистка логов
-
-Скрипт `scripts/clean_logs.sh` полностью очищает логи **без остановки сервиса**.
-
-```bash
-scp scripts/clean_logs.sh root@<IP>:/opt/
-ssh root@<IP> "chmod +x /opt/clean_logs.sh && /opt/clean_logs.sh"
-```
-
----
-
-## 👥 Добавление нового разработчика
-
-1. **GitHub:** пригласить в репозиторий (**Settings → Collaborators**).
-2. **Telegram:** добавить в группу уведомлений.
-3. **(Опционально)** Если нужен прямой SSH-доступ:
-   - Создать пользователя на сервере и добавить в группу `tgbot`.
-   - Настроить `sudo` по аналогии с `github-deploy`.
-   - Добавить его публичный SSH-ключ.
-
----
-
-## 🛠️ Разработка
-
-### Добавление новых команд
-
-Логика обработки сообщений находится в `internal/bot/bot.go` (метод `handleCommand`). Для добавления команды расширьте `switch`:
-
-```go
-case "/newfeature":
-    return "✨ Новая возможность!"
-```
-
-### Уровни логирования
-
-Управляются через `.env` или секреты CI/CD переменной `LOG_LEVEL`. Допустимые значения: `debug`, `info`, `warn`, `error`.
-
----
-
-## 📈 Планы по развитию
-
-- [x] Структурированное логирование
-- [x] CI/CD с уведомлениями
-- [ ] Мониторинг живости (Healthchecks.io)
-- [ ] Метрики и алерты
-- [ ] Production-окружение
-- [ ] Контейнеризация (Docker)
+- **Язык:** Go 1.22
+- **Telegram API:** [go-telegram-bot-api/v5](https://github.com/go-telegram-bot-api/telegram-bot-api)
+- **Логирование:** `log/slog` + [lumberjack](https://github.com/natefinch/lumberjack)
+- **Конфигурация:** [godotenv](https://github.com/joho/godotenv)
+- **CI/CD:** GitHub Actions (сборка, тесты, деплой по SSH)
+- **Инфраструктура:** Linux VPS, systemd, разделение пользователей (`tgbot`, `github-deploy`)
 
 ---
 
 ## 📄 Лицензия
 
-Проект распространяется под лицензией MIT. См. файл [LICENSE](./LICENSE).
-
----
-
-**Happy hacking!** 🚀
+MIT. См. файл [LICENSE](./LICENSE).
