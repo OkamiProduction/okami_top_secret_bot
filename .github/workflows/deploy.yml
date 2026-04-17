@@ -26,7 +26,16 @@ jobs:
       - name: Build binary
         run: GOOS=linux GOARCH=amd64 go build -o tgbot .
 
-      # Шаг 4: Копируем собранный бинарник на сервер по SCP
+      # Шаг 4: Удаляем старый бинарник на сервере
+      - name: Remove old binary
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          script: sudo rm -f /opt/tgbot/tgbot
+
+      # Шаг 5: Копируем собранный бинарник на сервер по SCP
       - name: Copy binary to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -37,7 +46,7 @@ jobs:
           target: "/opt/tgbot/"                          # Куда копируем на сервере
           strip_components: 0                            # Не удалять компоненты пути
 
-      # Шаг 5: Создаём .env файл на сервере и перезапускаем сервис
+      # Шаг 6: Создаём .env файл на сервере и перезапускаем сервис
       - name: Create .env and restart service
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -69,7 +78,7 @@ jobs:
 
             echo "✅ Staging деплой завершён"
 
-      # Шаг 6: Отправляем уведомление в Telegram о результате деплоя
+      # Шаг 7: Отправляем уведомление в Telegram о результате деплоя
       - name: Send Telegram notification
         if: always()   # Выполняется всегда, даже если предыдущие шаги упали (чтобы видеть ошибки)
         uses: appleboy/telegram-action@master
